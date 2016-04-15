@@ -487,15 +487,18 @@ GET = "get"
 POST = "post"
 DELETE = "delete"
 
-CONTROLLER_IP = read_config_file('apicem', 'CONTROLLER_iP')
-CONTROLLER_PORT = read_config_file('apicem', 'CONTROLLER_PORT')
+SECTION_APIC_EM = 'apic-em'
+SECTION_XMPP = 'xmpp'
+
+CONTROLLER_IP = read_config_file(SECTION_APIC_EM, 'CONTROLLER_iP')
+CONTROLLER_PORT = read_config_file(SECTION_APIC_EM, 'CONTROLLER_PORT')
 CONTROLLER_URL = "https://" + CONTROLLER_IP + ":" + CONTROLLER_PORT + "/"
 TICKET_URL = CONTROLLER_URL + "api/v1/ticket"
-APICEM_USERNAME = read_config_file('apicem', 'APICEM_USERNAME')
-APICEM_PASSWORD = read_config_file('apicem', 'APICEM_PASSWORD')
+APICEM_USERNAME = read_config_file(SECTION_APIC_EM, 'APICEM_USERNAME')
+APICEM_PASSWORD = read_config_file(SECTION_APIC_EM, 'APICEM_PASSWORD')
 
-XMPP_USERNAME = read_config_file('xmpp', 'XMPP_USERNAME')
-XMPP_PASSWORD = read_config_file('xmpp', 'XMPP_PASSWORD')
+XMPP_USERNAME = read_config_file(SECTION_XMPP, 'XMPP_USERNAME')
+XMPP_PASSWORD = read_config_file(SECTION_XMPP, 'XMPP_PASSWORD')
 							
 bot = ApicEmJabberBot(XMPP_USERNAME, XMPP_PASSWORD)
 #bot.presence(chat)
