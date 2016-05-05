@@ -12,11 +12,7 @@ from ConfigParser import SafeConfigParser
 
 import re
 
-# Define constants
-GET = "get"
-POST = "post"
-DELETE = "delete"
-
+# Helper function to grab config data from config.conf
 def read_config_file(section, option):
 	config = SafeConfigParser()
 	config.read('config.conf')
@@ -30,10 +26,10 @@ def read_config_file(section, option):
 
 class ApicEmJabberBot(JabberBot):
 
+	# Additional initialization (beyond the JabberBot initialization, which takes care of the XMPP connection)
 	def init(self):
-		
-		SECTION_APIC_EM = 'apic-em'
-		SECTION_XMPP = 'xmpp'
+        # PRE:	True
+        # POST:	APIC-EM Controller details have been read from config.conf (IP address, port number, ticket url, username and password
 
 		self._CONTROLLER_IP = read_config_file(SECTION_APIC_EM, 'CONTROLLER_IP')
 		self._CONTROLLER_PORT = read_config_file(SECTION_APIC_EM, 'CONTROLLER_PORT')
@@ -42,15 +38,15 @@ class ApicEmJabberBot(JabberBot):
 		self._APICEM_USERNAME = read_config_file(SECTION_APIC_EM, 'APICEM_USERNAME')
 		self._APICEM_PASSWORD = read_config_file(SECTION_APIC_EM, 'APICEM_PASSWORD')
 
-		self._XMPP_USERNAME = read_config_file(SECTION_XMPP, 'XMPP_USERNAME')
-		self._XMPP_PASSWORD = read_config_file(SECTION_XMPP, 'XMPP_PASSWORD')
-
 #        @botcmd
 #        def test(self, mess, args):
 #                """test"""
 #                result = args.split()
 #                return result[0]
                 
+        # All bot commands are preceded by @botcmd
+        # These commands will be listed when asking the bot "help"
+
 	@botcmd
 	def echo(self, mess, args):
 			"""echo {args}"""
@@ -58,7 +54,7 @@ class ApicEmJabberBot(JabberBot):
 			
 	@botcmd
 	def adduser(self, mess, args):
-		"""Add a user w/ {username} {password} {scope} {role}, for instance 'adduser jdoe Cisco123$ ALL ROLE_ADMIN'"""
+		"""Add a user w/ {username} {password} {scope} {role}, for instance 'adduser jdoe Cisco123$ ALL ROLE_ADMIN', defaults to scope == ALL and role == ROLE_ADMIN"""
 		url = self._CONTROLLER_URL + 'api/v1/user'
 		arguments = args.split()
 
@@ -68,22 +64,26 @@ class ApicEmJabberBot(JabberBot):
 				return "Error: user " + arguments[0] + " already exists. Choose a different user name."
 
 			if 2 == len(arguments):
+			        # Set default scope and role, since only username and password were provided
 				scope = "ALL"
 				role = "ROLE_ADMIN"
 			
 			elif 4 == len(arguments):
 				if arguments[2] <> "ALL":
+				# If scope provided, it must be "ALL"
 					return "Error: scope '" + arguments[2] + "' not supported. Scope must be 'ALL'."
 		
-				roles = getRoles()
+				roles = self.getRoles()
 				if arguments[3] not in roles:
+				        # If role provided, it must be an existing role
 					outputString = "Error: role '" + arguments[3] + "' no allowed. Role must be in "
-					outputString += getRolesString() + ", e.g., '" + roles[0] + "'."
+					outputString += self.getRolesString() + ", e.g., '" + roles[0] + "'."
 					return outputString
 						
 				scope = arguments[2]
 				role = arguments[3]
-					
+			
+			# Succesfully passed all the sanity checks of this adduser request		
 			data = ({
 				"username": arguments[0],
 				"password": arguments[1],
@@ -93,10 +93,12 @@ class ApicEmJabberBot(JabberBot):
 				}]
 			})
 
-			response = self, doRestCall(POST, url, data)
+                        # Perform the actual rest call
+			response = self.doRestCall(POST, url, data)
 			if "No data returned!" == response:
+			        # Oops, the password was not accepted by APIC-EM
 				return "Error: password '" + arguments[1] + "' not compliant with security policy. Use a stronger password."
-							
+			
 			response_json = response.json()
 			
 			return json.dumps(
@@ -105,10 +107,11 @@ class ApicEmJabberBot(JabberBot):
 				separators=(',', ':')
 			)
 		else:
+		        # The user did not provide the right amount of arguments (should provide 2 or 4 arguments)
 			roles = self.getRoles()
 			print "len(roles): " + str(len(roles))
 			outputString = "adduser requires four arguments: {username} {password} {scope: (ALL)} {role: "
-			outputString += getRolesString()
+			outputString += self.getRolesString()
 			outputString += "},\ne.g. 'adduser jdoe Cisco123$ ALL ROLE_OBSERVER'."
 			return outputString
 					
@@ -197,27 +200,6 @@ class ApicEmJabberBot(JabberBot):
 			outputString += "\n !---> " + role
 		return outputString
 
-#        @botcmd
-#        def network_device_config(self, mess, args):
-#                """Returns the config of network device with {id}"""
-#
-#                url = controller_url + 'api/v1/network-device/' + args + '/config'
-#        
-#                response = requests.get(
-#                        url,
-#                        headers={
-#                                "X-Auth-Token": createserviceticket(),
-#                                "Content-Type":"application/json"
-#                        },
-#                        verify=False
-#                )
-#                response_json = response.json()
-#                return "Device config = " + json.dumps(
-#                        response_json,
-#                        indent=4,
-#                        separators=(',', ':')
-#                )
-
 	@botcmd
 	def getusers(self, mess, args):
 		"""Returns all users"""
@@ -225,12 +207,6 @@ class ApicEmJabberBot(JabberBot):
 		url = self._CONTROLLER_URL + 'api/v1/user'
 
 		response = self.getresponse(url)
-#                response_json = response.json()
-#                return "Users = " + json.dumps(
-#                        response_json,
-#                        indent=4,
-#                        separators=(',', ':')
-#                )
 
 		binary = response.content
 		output = json.loads(binary)
@@ -266,19 +242,19 @@ class ApicEmJabberBot(JabberBot):
 		"""Say hello to ApicEmJabberBot"""
 		return "Hello " + mess.getFrom().getStripped() + ", my name is ApicEmJabberBot.\nI'm your xmppp interface to https://sandboxapic.cisco.com, a public APIC-EM on Cisco's devnet.\nFor help, just say 'help'.\nHave a nice day!"
 			
-	@botcmd
-	def topology(self, mess, args):
-		"""Returns the topology"""
-
-		url = self._CONTROLLER_URL + 'api/v1/topology/physical-topology'
-
-		response = self.getresponse(url)
-		response_json = response.json()
-		return "Topology = " + json.dumps(
-			response_json,
-			indent=4,
-			separators=(',', ':')
-		)
+#	@botcmd
+#	def topology(self, mess, args):
+#		"""Returns the topology"""
+#
+#		url = self._CONTROLLER_URL + 'api/v1/topology/physical-topology'
+#
+#		response = self.getresponse(url)
+#		response_json = response.json()
+#		return "Topology = " + json.dumps(
+#			response_json,
+#			indent=4,
+#			separators=(',', ':')
+#		)
 			
 	@botcmd
 	def serverinfo( self, mess, args):
@@ -298,23 +274,31 @@ class ApicEmJabberBot(JabberBot):
 		"""Tells you your username"""
 		return mess.getFrom().getStripped()
 
+    # End of ApicEmJabberBot commands
+        
+    # Begin of ApicEmJabberBot helper functions
+        
+    # Returns the users configured on APIC-EM
 	def getUsers(self):
+	    # PRE:	True
+	    # POST: getUsers == list of user names
 		url = self._CONTROLLER_URL + 'api/v1/user'
 		
 		response = self.doRestCall(GET, url)
 
-#        print "getUsers response: " + response.text + "\n"
-		
 		binary = response.content
 		output = json.loads(binary)
 		
 		users = []
 		for user in output['response']:
 			users.append(user['username'])
-#        print "Users: " + str(len(users))
-		return users
 
+		return users
+		
+    # Returns all the device id's known to APIC-EM
 	def getDeviceIDs(self):
+	    # PRE:	True
+	    # POST:	getDeviceIDs == list of device id's on APIC-EM
 		url = self._CONTROLLER_URL + 'api/v1/network-device'
 		
 		response = self.doRestCall(GET, url)
@@ -327,8 +311,11 @@ class ApicEmJabberBot(JabberBot):
 			deviceIDs.append(device['id'])
 						
 		return deviceIDs
-				
+	
+	# Returns all the roles on APIC-EM			
 	def getRoles(self):
+	    # PRE:	True
+	    # POST:	getRoles == list roles on APIC-EM
 		url = self._CONTROLLER_URL + 'api/v1/user/role'
 
 		response = self.doRestCall(GET, url)
@@ -341,9 +328,12 @@ class ApicEmJabberBot(JabberBot):
 			roles.append(role['role']) 
 
 		return roles
-		
+	
+	# Returns a formatted string containing all the roles on APIC-EM	
 	def getRolesString(self):
-		roles = getRoles()
+	    # PRE:	True
+	    # POST:	getRolesString == formatted string containing all roles (separated by '|')
+		roles = self.getRoles()
 		outputString = "("
 		if 0 < len(roles):
 			outputString += roles[0]
@@ -355,9 +345,11 @@ class ApicEmJabberBot(JabberBot):
 		outputString += ")"
 		return outputString
 
-		
-			
+	# Returns a service ticket which proves successful authentication
 	def getServiceTicket(self):
+	    # PRE:	self._APICEM_USERNAME and self._APICEM_PASSWORD are valid admin credentials
+	    # POST: getServiceTicket == authenticated service ticket
+	        
 		ticket=None
 		#specify the username and password which will be included in the data.  Replace 'xxxx' with
 		#your username and password
@@ -387,7 +379,8 @@ class ApicEmJabberBot(JabberBot):
 			ticket = r_json["response"]["serviceTicket"]
 			print ("ticket: ", ticket)
 			return ticket
-
+			
+    # Predecessor to getServiceTicket. Not yet fully deprecated -- to be decommissioned
 	def createserviceticket(self):
 		response = requests.post(
 			url = self._CONTROLLER_URL + 'api/v1/ticket',
@@ -464,9 +457,13 @@ class ApicEmJabberBot(JabberBot):
 			print( "Error: %s  Details: %s StackTrace: %s" % (err,msg_det,traceback.format_exc()))
 			return "Error: %s  Details: %s StackTrace: %s" % (err,msg_det,traceback.format_exc())
 
+	# Performs the rest call and returns json
 	def doRestCallJson(self, command, request_URL, aData=None):
+	    # PRE:	command in [GET, POST, DELETE]
+	    # POST:	json encoded reponse to calling request_URL
 		return self.doRestCall(command, request_URL, aData).json()
-
+		
+    # Performs a GET and returns the response
 	def getresponse(self, url):
 		response = requests.get(
 			url,
@@ -478,6 +475,7 @@ class ApicEmJabberBot(JabberBot):
 		)
 		return response
 
+    # Performs a POST and returns the response
 	def postresponse(self, url):
 		response = requests.post(
 			url,
@@ -497,10 +495,20 @@ class ApicEmJabberBot(JabberBot):
 		)
 		return response
 
+# End of class ApicEmJabberBot
+
+# Start of main code			
+
+# Define constants
+GET = "get"
+POST = "post"
+DELETE = "delete"
+SECTION_APIC_EM = 'apic-em'
+SECTION_XMPP = 'xmpp'
+XMPP_USERNAME = read_config_file(SECTION_XMPP, 'XMPP_USERNAME')
+XMPP_PASSWORD = read_config_file(SECTION_XMPP, 'XMPP_PASSWORD')
 			
-		
-			
-bot = ApicEmJabberBot()
+bot = ApicEmJabberBot(XMPP_USERNAME, XMPP_PASSWORD)
 bot.init()
 #bot.presence(chat)
 bot.serve_forever()
